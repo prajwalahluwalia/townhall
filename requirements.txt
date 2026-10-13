@@ -1,6 +1,7 @@
 # Runtime dependencies for the Vercel Python function (api/index.py).
 # Local development and tests use backend/requirements.txt.
 fastapi==0.143.0
+uvicorn[standard]==0.54.0
 # Only needed when accounts and saved games are switched back on (see backend/app/main.py):
 # SQLAlchemy==2.1.4
 # psycopg[binary]==3.3.6
