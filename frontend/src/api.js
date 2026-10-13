@@ -44,12 +44,20 @@ async function request(method, path, body) {
 }
 
 export const api = {
+  islands: () => request('GET', '/islands'),
+  // Play without an account: send the game along, the server saves nothing.
+  play: (play) => request('POST', '/play', play),
+  decide: (play, cardId, optionId) => request('POST', '/play/decide', { ...play, card_id: cardId, option_id: optionId }),
+  report: (play) => request('POST', '/play/report', play),
+}
+
+// Accounts and saved games, switched off for now (see backend/app/main.py).
+export const accountsApi = {
   register: (body) => request('POST', '/auth/register', body),
   login: (body) => request('POST', '/auth/login', body),
   me: () => request('GET', '/auth/me'),
-  islands: () => request('GET', '/islands'),
   games: () => request('GET', '/games'),
-  newGame: (islandId) => request('POST', '/games', { island_id: islandId }),
+  newGame: (islandId, scenarioId) => request('POST', '/games', { island_id: islandId, scenario_id: scenarioId }),
   game: (id) => request('GET', `/games/${id}`),
   decide: (id, cardId, optionId) => request('POST', `/games/${id}/decisions`, { card_id: cardId, option_id: optionId }),
   fastForward: (id) => request('POST', `/games/${id}/fast-forward`),

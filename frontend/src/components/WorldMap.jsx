@@ -49,7 +49,10 @@ function Blob({ x, y, r, fill }) {
   )
 }
 
-export default function WorldMap({ island, world, atWar = true, stance = null, compact = false }) {
+// mode: 'war' (Petra and Granara fight, the strait closes) or 'trade' (Aurum and Forge wall themselves off)
+export default function WorldMap({ island, world, mode = 'war', stance = null, compact = false }) {
+  const atWar = mode === 'war'
+  const tradeWar = mode === 'trade'
   const route = (from, via) => {
     const [x1, y1] = PLACES[from]
     const [x2, y2] = PLACES.you
@@ -57,10 +60,14 @@ export default function WorldMap({ island, world, atWar = true, stance = null, c
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - 18
     return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`
   }
-  const blocked = (id) => atWar && (id === 'granara' || (id === 'petra' && stance !== 'neutral'))
+  const blocked = (id) => (atWar && (id === 'granara' || (id === 'petra' && stance !== 'neutral')))
+    || (tradeWar && (id === 'aurum' || id === 'forge'))
+  const hostile = (id) => (atWar && (id === 'petra' || id === 'granara')) || (tradeWar && (id === 'aurum' || id === 'forge'))
+  const label = atWar ? '. Petra and Granara are at war and the strait is closed.'
+    : tradeWar ? '. Aurum and Forge are in a trade war.' : ''
   return (
     <svg viewBox="0 0 420 250" className={`world-map ${compact ? 'compact' : ''}`} role="img"
-      aria-label={`Map: ${island.name} and its trading partners${atWar ? '. Petra and Granara are at war and the strait is closed.' : ''}`}>
+      aria-label={`Map: ${island.name} and its trading partners${label}`}>
       <defs>
         <linearGradient id="wm-sea" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#4cc9f0" />
@@ -97,11 +104,21 @@ export default function WorldMap({ island, world, atWar = true, stance = null, c
         </g>
       )}
 
+      {tradeWar && (
+        <g>
+          <path d={`M${PLACES.forge[0] + 24},${PLACES.forge[1] - 6} L${PLACES.aurum[0] - 24},${PLACES.aurum[1]}`}
+            stroke="#ff6b6b" strokeWidth="2.5" strokeDasharray="4 4" />
+          <g transform={`translate(${(PLACES.forge[0] + PLACES.aurum[0]) / 2},${(PLACES.forge[1] + PLACES.aurum[1]) / 2 - 2})`} className="pulse">
+            <text textAnchor="middle" fontSize="16" y="5">🧱</text>
+          </g>
+        </g>
+      )}
+
       {Object.entries(PLACES).filter(([id]) => id !== 'you').map(([id, [x, y]]) => {
         const info = world.find((w) => w.id === id)
         return (
           <g key={id}>
-            <Blob x={x} y={y} r={22} fill={atWar && (id === 'petra' || id === 'granara') ? '#e9b8a0' : '#b7d99a'} />
+            <Blob x={x} y={y} r={22} fill={hostile(id) ? '#e9b8a0' : '#b7d99a'} />
             <g transform={`translate(${x},${y - 2})`}>{PARTNER_ICON[id]}</g>
             <text x={x} y={y + 26} textAnchor="middle" className="map-label">{info?.name}</text>
             {!compact && <text x={x} y={y + 37} textAnchor="middle" className="map-label small">{info?.exports}</text>}

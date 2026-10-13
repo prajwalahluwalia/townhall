@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '../api'
+import { loadPlay, savePlay } from '../play'
+import Explain from '../components/Explain'
 import Hud from '../components/Hud'
+import Modal from '../components/Modal'
 import IslandArt from '../components/IslandArt'
 import { skyForTime } from '../series'
 import Portrait from '../components/Portrait'
 import TopBar from '../components/TopBar'
+import useSceneFit from '../components/useSceneFit'
 import WorldMap from '../components/WorldMap'
 
 const DELTA_LABELS = {
@@ -17,49 +21,131 @@ const DELTA_LABELS = {
   interest_rate: ['Interest rate', (v) => `${v.toFixed(1)}%`, 0],
 }
 
-function Progress({ step, total, time }) {
+function Progress({ step, total, time, onPick }) {
   return (
     <div className="progress">
       <span className="clock" aria-label={`Time ${time}`}>🕰️ {time}</span>
       <span className="dots" aria-label={`Decision ${Math.min(step + 1, total)} of ${total}`}>
-        {Array.from({ length: total }, (_, i) => <span key={i} className={i < step ? 'done' : i === step ? 'now' : ''} />)}
+        {Array.from({ length: total }, (_, i) => i < step ? (
+          <button key={i} className="done" onClick={() => onPick(i)} title={`Look back at decision ${i + 1}`}
+            aria-label={`Look back at decision ${i + 1}`} />
+        ) : <span key={i} className={i === step ? 'now' : ''} />)}
       </span>
     </div>
   )
 }
 
+// The day's visitors in order: what you chose (click to look back), who is in the office now,
+// and who is still waiting outside.
+function Agenda({ game, onPick }) {
+  const crowd = { cheer: ['good', 'Cheered'], boo: ['bad', 'Booed'], mixed: ['', 'Mixed'] }
+  return (
+    <section className="agenda panel" aria-label="Today's appointments">
+      <h3>Today's appointments</h3>
+      <ol>
+        {game.agenda.map((a, i) => {
+          const done = game.decisions[i]
+          const now = i === game.step
+          const inner = (
+            <>
+              <span className="agenda-time">{a.time}</span>
+              <Portrait kind={a.speaker_icon} size={26} />
+              <span className="agenda-what">
+                {done ? <><span aria-hidden>{done.icon}</span> {done.option_title}</> : a.speaker}
+              </span>
+              {done && <span className={`chip ${crowd[done.reaction.crowd][0]}`}>{crowd[done.reaction.crowd][1]}</span>}
+              {now && <span className="chip now">In your office</span>}
+            </>
+          )
+          return (
+            <li key={i} className={done ? 'done' : now ? 'now' : 'later'}>
+              {done ? <button onClick={() => onPick(i)} title="Look back at this decision">{inner}</button> : <div>{inner}</div>}
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
+function Briefing({ scenario, map }) {
+  return (
+    <>
+      <p className="lede"><Explain>{scenario.intro}</Explain></p>
+      <ul className="briefing">
+        {scenario.briefing.map((b) => <li key={b}><Explain>{b}</Explain></li>)}
+      </ul>
+      {map}
+    </>
+  )
+}
+
+function OptionGrid({ card, chosenId, onChoose, disabled }) {
+  return (
+    <div className={`options n${card.options.length}`}>
+      {card.options.map((o, i) => (
+        <motion.button
+          key={o.id}
+          className={`option ${o.id === chosenId ? 'chosen' : ''}`}
+          onClick={onChoose ? () => onChoose(o) : undefined}
+          disabled={disabled || !onChoose}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 + i * 0.07 }}
+          whileHover={onChoose ? { y: -4 } : undefined}
+          whileTap={onChoose ? { scale: 0.97 } : undefined}
+        >
+          <span className="option-icon" aria-hidden>{o.icon}</span>
+          <span className="option-title">{o.title}{o.id === chosenId && <span className="chosen-tag">Your choice</span>}</span>
+          <span className="option-summary"><Explain nested>{o.summary}</Explain></span>
+        </motion.button>
+      ))}
+    </div>
+  )
+}
+
 export default function Game() {
-  const { id } = useParams()
   const navigate = useNavigate()
+  const [play, setPlay] = useState(loadPlay)
   const [game, setGame] = useState(null)
   const [world, setWorld] = useState([])
   const [reaction, setReaction] = useState(null) // { option, reaction, nextGame }
   const [introSeen, setIntroSeen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [showBriefing, setShowBriefing] = useState(false)
+  const [review, setReview] = useState(null) // index of a past decision being looked at
+  const closeBriefing = useCallback(() => setShowBriefing(false), [])
+  const closeReview = useCallback(() => setReview(null), [])
+  const sceneCol = useRef(null)
+  useSceneFit(sceneCol)
 
   useEffect(() => {
-    Promise.all([api.game(id), api.islands()])
+    if (!play) return
+    Promise.all([api.play(play), api.islands()])
       .then(([g, i]) => {
         setGame(g)
         setWorld(i.world)
         setIntroSeen(g.step > 0)
       })
       .catch((e) => setError(e.message))
-  }, [id])
+    // Only on arrival: later choices update `game` directly.
+  }, [])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [game?.step, reaction, introSeen])
 
+  if (!play) return <Navigate to="/" replace />
   if (error && !game) return <div className="page"><TopBar /><div className="loading-screen">{error}</div></div>
   if (!game) return <div className="page"><TopBar /><div className="loading-screen">Unlocking your office…</div></div>
-  if (game.status === 'completed') return <Navigate to={`/game/${id}/report`} replace />
 
   const island = game.island
   const card = game.card
   const chosen = Object.fromEntries(game.decisions.map((d) => [d.card_id, d.option_id]))
   const stance = chosen.war || null
+  const scenario = game.scenario
+  const map = scenario.map ? <WorldMap island={island} world={world} mode={scenario.map} stance={stance} /> : null
   const time = reaction ? reaction.time : card ? card.time : '21:00'
   const lastCrowd = reaction ? reaction.reaction.crowd : game.decisions.at(-1)?.reaction.crowd || 'mixed'
 
@@ -68,7 +154,8 @@ export default function Game() {
     setBusy(true)
     setError('')
     try {
-      const res = await api.decide(game.id, card.id, option.id)
+      const res = await api.decide(play, card.id, option.id)
+      setPlay(savePlay({ ...play, decisions: [...play.decisions, [card.id, option.id]] }))
       setReaction({ option, reaction: res.reaction, nextGame: res.game, time: card.time, speaker: card.speaker_icon })
     } catch (e) {
       setError(e.message)
@@ -82,30 +169,63 @@ export default function Game() {
     setReaction(null)
   }
 
-  const fastForward = async () => {
+  const fastForward = () => navigate('/play/forward')
+
+  // Go back to an earlier visitor and decide again. Everything after it is cleared.
+  const rewind = async (step) => {
+    const later = play.decisions.length - step - 1
+    if (later > 0 && !window.confirm(`Change this decision? Your ${later} later decision${later > 1 ? 's' : ''} will be cleared.`)) return
+    const rewound = { ...play, decisions: play.decisions.slice(0, step) }
     setBusy(true)
     try {
-      await api.fastForward(game.id)
-      navigate(`/game/${game.id}/forward`)
+      setGame(await api.play(rewound))
+      setPlay(savePlay(rewound))
+      setReaction(null)
+      setReview(null)
     } catch (e) {
       setError(e.message)
+    } finally {
       setBusy(false)
     }
   }
+  const past = review != null ? shownGame().decisions[review] : null
 
-  const shownGame = reaction ? reaction.nextGame : game
+  function shownGame() {
+    return reaction ? reaction.nextGame : game
+  }
 
   return (
-    <div className={`page game-page sky-${skyForTime(time)}`}>
-      <TopBar>
-        <Progress step={shownGame.step} total={game.total_steps} time={time} />
+    <div className={`page fit game-page sky-${skyForTime(time)}`}>
+      <TopBar actions={introSeen && <button className="btn small" onClick={() => setShowBriefing(true)}>📋 Briefing</button>}>
+        <Progress step={shownGame().step} total={game.total_steps} time={time} onPick={setReview} />
       </TopBar>
-      <Hud stats={shownGame.live_stats} deltas={reaction?.reaction.deltas} currencyCode={island.currency_code} />
+      {showBriefing && (
+        <Modal title={`${scenario.icon} ${scenario.title}`} onClose={closeBriefing} wide>
+          <Briefing scenario={scenario} map={map} />
+        </Modal>
+      )}
+      {past && (
+        <Modal title={`${past.time} · ${past.card.title}`} onClose={closeReview} wide>
+          <div className="visitor">
+            <Portrait kind={past.card.speaker_icon} size={56} />
+            <span className="eyebrow">{past.card.speaker}</span>
+          </div>
+          <div className="speech"><Explain>{past.card.situation}</Explain></div>
+          <OptionGrid card={past.card} chosenId={past.option_id} />
+          <div className="review-foot">
+            <span className="muted small">The crowd {past.reaction.crowd === 'cheer' ? 'cheered' : past.reaction.crowd === 'boo' ? 'booed' : 'was unsure'}: {past.reaction.quote}</span>
+            <button className="btn" onClick={() => rewind(past.step)} disabled={busy}>↩ Change this decision</button>
+          </div>
+        </Modal>
+      )}
+      <Hud stats={shownGame().live_stats} deltas={reaction?.reaction.deltas} currencyCode={island.currency_code} />
 
       <main className="day-layout">
-        <section className="scene-col">
+        <section className="scene-col" ref={sceneCol}>
+          <div className="scene-box">
           <div className="scene-frame">
             <IslandArt
+              fill
               island={island}
               sky={skyForTime(time)}
               mood={lastCrowd}
@@ -124,25 +244,23 @@ export default function Game() {
               <strong>{island.name}</strong> · {island.tier_label}
             </div>
           </div>
-          {introSeen && (
-            <div className="mini-map">
-              <WorldMap island={island} world={world} atWar stance={stance} compact />
-            </div>
-          )}
+          </div>
+          {/* The world map lives in the Briefing; this spot shows the day's appointments. */}
+          <Agenda game={shownGame()} onPick={setReview} />
         </section>
 
         <section className="desk-col">
           <AnimatePresence mode="wait">
             {!introSeen && card && (
               <motion.div key="intro" className="panel desk intro" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                <span className="eyebrow">Day 1 · {game.scenario.title}</span>
+                <span className="eyebrow">Day 1 · {scenario.category} · {scenario.title}</span>
                 <h1>Good morning, Governor.</h1>
-                <p className="lede">{game.scenario.intro}</p>
+                <Briefing scenario={scenario} map={null} />
                 <p>
-                  Seven people will come to your office today. Each one brings a problem, and each choice gets an
-                  instant reaction. The real consequences show up later, when we fast-forward two years.
+                  {game.total_steps} people will come to your office today. Each one brings a problem, and each choice
+                  gets an instant reaction. The real consequences show up later, when we fast-forward two years.
                 </p>
-                <WorldMap island={island} world={world} atWar />
+                {map}
                 <button className="btn primary big" onClick={() => setIntroSeen(true)}>Open the office doors</button>
               </motion.div>
             )}
@@ -156,26 +274,8 @@ export default function Game() {
                     <h2>{card.title}</h2>
                   </div>
                 </div>
-                <div className="speech">{card.situation}</div>
-                <div className={`options n${card.options.length}`}>
-                  {card.options.map((o, i) => (
-                    <motion.button
-                      key={o.id}
-                      className="option"
-                      onClick={() => choose(o)}
-                      disabled={busy}
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 + i * 0.07 }}
-                      whileHover={{ y: -4 }}
-                      whileTap={{ scale: 0.97 }}
-                    >
-                      <span className="option-icon" aria-hidden>{o.icon}</span>
-                      <span className="option-title">{o.title}</span>
-                      <span className="option-summary">{o.summary}</span>
-                    </motion.button>
-                  ))}
-                </div>
+                <div className="speech"><Explain>{card.situation}</Explain></div>
+                <OptionGrid card={card} onChoose={choose} disabled={busy} />
                 {error && <p className="error">{error}</p>}
               </motion.div>
             )}

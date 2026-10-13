@@ -64,6 +64,7 @@ export default function Home() {
                         <h3>{g.island_name}</h3>
                         <span className={`tier tier-${island?.tier}`}>{g.tier_label}</span>
                       </div>
+                      <p className="term-crisis"><span aria-hidden>{g.scenario_icon}</span> {g.scenario_title}</p>
                       {done ? (
                         <p className="term-status"><strong>{g.ending}</strong> · Score {g.score}</p>
                       ) : (

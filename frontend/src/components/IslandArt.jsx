@@ -132,6 +132,7 @@ export default function IslandArt({
   className = '',
   crowd = true,
   title,
+  fill = false, // cover its box (cropping the edges) instead of keeping the whole picture visible
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const art = island.art
@@ -186,7 +187,8 @@ export default function IslandArt({
   const night = sky === 'night'
 
   return (
-    <svg viewBox="0 0 400 280" className={`island-art ${className}`} role="img" aria-label={title || `${island.name} island`}>
+    <svg viewBox="0 0 400 280" preserveAspectRatio={fill ? 'xMidYMid slice' : 'xMidYMid meet'}
+      className={`island-art ${className}`} role="img" aria-label={title || `${island.name} island`}>
       <defs>
         {skyColors && (
           <linearGradient id={`sky${uid}`} x1="0" y1="0" x2="0" y2="1">

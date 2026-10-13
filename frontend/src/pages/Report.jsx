@@ -1,22 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { api } from '../api'
+import { loadPlay, newPlay } from '../play'
+import Explain from '../components/Explain'
 import IslandArt from '../components/IslandArt'
 import LineChart from '../components/LineChart'
 import Portrait from '../components/Portrait'
 import TopBar from '../components/TopBar'
+import { CAUSES } from '../causes'
 import { moodFromApproval, quarterLabels, seriesOf } from '../series'
 
-const CAUSES = {
-  expectations: ['What people already expected', 'Inflation feeds on itself: if everyone expects prices to rise, shops and workers build that in.'],
-  fuel: ['Fuel prices (the war)', 'Oil from the strait got scarce and expensive. That cost travels into transport, farming and factories.'],
-  food: ['Food prices (the war)', 'Granara\'s grain fields became a battlefield.'],
-  printing: ['Newly printed money', 'More money but the same amount of goods, so each unit of money buys less.'],
-  currency: ['A weaker currency', 'When your money is worth less abroad, everything you import costs more.'],
-  wages: ['Wage rises passed on', 'Higher pay means higher costs, which businesses pass on as higher prices.'],
-  demand: ['Spending vs. supply', 'Positive means people were spending more than the island could produce. Negative means a slump pulled prices down.'],
-}
 
 const TILES = [
   { key: 'peak_inflation', label: 'Peak inflation', start: (s) => s.inflation, fmt: (v) => `${v.toFixed(1)}%`, better: -1 },
@@ -41,15 +35,16 @@ function ImpactChips({ items }) {
 }
 
 export default function Report() {
-  const { id } = useParams()
   const navigate = useNavigate()
+  const [play] = useState(loadPlay)
   const [report, setReport] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.report(id).then(setReport).catch((e) => setError(e.message))
-  }, [id])
+    if (play) api.report(play).then(setReport).catch((e) => setError(e.message))
+  }, [play])
 
+  if (!play) return <Navigate to="/" replace />
   if (!report) return <div className="page"><TopBar /><div className="loading-screen">{error || 'Writing the history books…'}</div></div>
 
   const sim = report.simulation
@@ -63,15 +58,18 @@ export default function Report() {
     currency_end: last.currency_index,
     debt_end: last.debt_to_gdp,
   }
-  const causes = Object.entries(report.peak.causes).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+  const causeText = { ...CAUSES, ...report.scenario.causes }
+  const causes = Object.entries(report.peak.causes)
+    .filter(([, v]) => Math.abs(v) >= 0.05)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
   const maxCause = Math.max(...causes.map(([, v]) => Math.abs(v)))
   const chosenGreen = report.consequence_map.some((c) => c.option_id === 'green')
   const currencySym = report.island.currency_code
   const moneyGrowth = ((last.money.bank + last.money.central) / 100 - 1) * 100
 
-  const playAgain = async () => {
-    const g = await api.newGame(report.island.id)
-    navigate(`/game/${g.id}`)
+  const playAgain = () => {
+    newPlay(report.island.id, report.scenario.id)
+    navigate('/play')
   }
 
   return (
@@ -80,7 +78,7 @@ export default function Report() {
       <main className="report">
         <section className="report-hero panel">
           <div className="hero-text">
-            <span className="eyebrow">{report.island.name} · two years after your day in office</span>
+            <span className="eyebrow">{report.island.name} · {report.scenario.icon} {report.scenario.title} · two years later</span>
             <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>{report.ending.title}</motion.h1>
             <p className="lede">{report.ending.text}</p>
             <div className="score">
@@ -90,8 +88,9 @@ export default function Report() {
               <span className="muted">out of 1000</span>
             </div>
             <div className="hero-actions">
-              <button className="btn primary" onClick={playAgain}>Replay {report.island.name} with different choices</button>
-              <Link className="btn" to="/new">Try another island</Link>
+              <button className="btn primary" onClick={playAgain}>Replay with different choices</button>
+              <Link className="btn" to={`/?island=${report.island.id}`}>Face another crisis</Link>
+              <Link className="btn" to="/">Try another island</Link>
             </div>
           </div>
           <IslandArt island={report.island} sky="evening" mood={moodFromApproval(last.approval)} green={chosenGreen} smoke={0.5 + last.output_gap / 6} />
@@ -128,11 +127,11 @@ export default function Report() {
             {causes.map(([k, v]) => (
               <li key={k}>
                 <div className="cause-head">
-                  <span>{CAUSES[k][0]}</span>
+                  <span>{causeText[k][0]}</span>
                   <strong>{v >= 0 ? '+' : '−'}{Math.abs(v).toFixed(1)}</strong>
                 </div>
                 <span className="cause-track"><motion.span className={`cause-fill ${v < 0 ? 'neg' : ''}`} initial={{ width: 0 }} whileInView={{ width: `${(Math.abs(v) / maxCause) * 100}%` }} viewport={{ once: true }} /></span>
-                <span className="muted small">{CAUSES[k][1]}</span>
+                <span className="muted small"><Explain>{causeText[k][1]}</Explain></span>
               </li>
             ))}
           </ul>
@@ -155,7 +154,7 @@ export default function Report() {
                 <div className="chain">
                   {c.chain.map((step, i) => (
                     <motion.div key={i} className={`chain-step ${i === 0 ? 'first' : ''}`} initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.15 + i * 0.15 }}>
-                      {step}
+                      <Explain>{step}</Explain>
                     </motion.div>
                   ))}
                 </div>
@@ -269,9 +268,9 @@ export default function Report() {
           <h2>Ready for another term?</h2>
           <p>Try the opposite of what you did and compare. That's the quickest way to see what each choice really does.</p>
           <div className="hero-actions">
-            <button className="btn primary" onClick={playAgain}>Replay {report.island.name}</button>
-            <Link className="btn" to="/new">Try another island</Link>
-            <Link className="btn ghost" to="/">All my terms</Link>
+            <button className="btn primary" onClick={playAgain}>Replay this crisis</button>
+            <Link className="btn" to={`/?island=${report.island.id}`}>Face another crisis on {report.island.name}</Link>
+            <Link className="btn" to="/">Try another island</Link>
           </div>
         </section>
       </main>

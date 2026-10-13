@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..auth import current_user
 from ..db import get_db
-from ..game.cards import SCENARIO, SCENARIO_ID, find_option, get_cards
 from ..game.engine import build_report, live_stats, start_sustainability
 from ..game.islands import WORLD, get_island, public_islands
+from ..game.scenarios import SCENARIOS, find_option, get_cards, public_scenario, setup
 from ..models import Decision, Game, User
 from ..schemas import DecisionIn, NewGameIn
 
@@ -19,7 +19,7 @@ def islands() -> dict:
     return {
         "islands": [{**i, "start": {**i["start"], "sustainability": start_sustainability(i)}} for i in public_islands()],
         "world": WORLD,
-        "scenario": SCENARIO,
+        "scenarios": [public_scenario(s) for s in SCENARIOS.values()],
     }
 
 
@@ -28,6 +28,13 @@ def _own_game(game_id: int, user: User, db: Session) -> Game:
     if game is None or game.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Game not found")
     return game
+
+
+def _setup(game: Game) -> tuple[dict, dict]:
+    found = setup(game.island_id, game.scenario_id)
+    if found is None:
+        raise HTTPException(status.HTTP_410_GONE, "This term's island or scenario no longer exists")
+    return found
 
 
 def _decision_view(cards: list[dict], d: Decision) -> dict:
@@ -40,14 +47,14 @@ def _decision_view(cards: list[dict], d: Decision) -> dict:
 
 
 def _game_view(game: Game) -> dict:
-    island = get_island(game.island_id)
-    cards = get_cards(island)
+    island, scenario = _setup(game)
+    cards = get_cards(island, scenario)
     step = game.current_step
     return {
         "id": game.id,
         "status": game.status,
         "island": {**island, "start": {**island["start"], "sustainability": start_sustainability(island)}},
-        "scenario": SCENARIO,
+        "scenario": public_scenario(scenario, island),
         "step": step,
         "total_steps": len(cards),
         "card": cards[step] if game.status == "in_office" and step < len(cards) else None,
@@ -64,15 +71,19 @@ def list_games(user: User = Depends(current_user), db: Session = Depends(get_db)
     games = db.scalars(select(Game).where(Game.user_id == user.id).order_by(Game.updated_at.desc())).all()
     out = []
     for g in games:
-        island = get_island(g.island_id)
+        found = setup(g.island_id, g.scenario_id)
+        island, scenario = found if found else (get_island(g.island_id), SCENARIOS.get(g.scenario_id))
         out.append({
             "id": g.id,
             "island_id": g.island_id,
             "island_name": island["name"] if island else g.island_id,
             "tier_label": island["tier_label"] if island else "",
+            "scenario_id": g.scenario_id,
+            "scenario_title": scenario["title"] if scenario else g.scenario_id,
+            "scenario_icon": scenario["icon"] if scenario else "",
             "status": g.status,
             "step": g.current_step,
-            "total_steps": len(get_cards(island)) if island else 0,
+            "total_steps": len(get_cards(island, scenario)) if found else 0,
             "score": g.score,
             "ending": g.ending,
             "updated_at": g.updated_at.isoformat(),
@@ -82,10 +93,13 @@ def list_games(user: User = Depends(current_user), db: Session = Depends(get_db)
 
 @router.post("/games", status_code=status.HTTP_201_CREATED)
 def new_game(body: NewGameIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    island = get_island(body.island_id)
-    if island is None:
+    if get_island(body.island_id) is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown island")
-    game = Game(user_id=user.id, island_id=island["id"], scenario_id=SCENARIO_ID, live_stats=live_stats(island, []))
+    found = setup(body.island_id, body.scenario_id)
+    if found is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown scenario")
+    island, scenario = found
+    game = Game(user_id=user.id, island_id=island["id"], scenario_id=scenario["id"], live_stats=live_stats(island, []))
     db.add(game)
     db.commit()
     db.refresh(game)
@@ -102,8 +116,8 @@ def decide(game_id: int, body: DecisionIn, user: User = Depends(current_user), d
     game = _own_game(game_id, user, db)
     if game.status != "in_office":
         raise HTTPException(status.HTTP_409_CONFLICT, "This term is already over")
-    island = get_island(game.island_id)
-    cards = get_cards(island)
+    island, scenario = _setup(game)
+    cards = get_cards(island, scenario)
     card = cards[game.current_step]
     if body.card_id != card["id"]:
         raise HTTPException(status.HTTP_409_CONFLICT, "That decision isn't on your desk right now")
@@ -134,12 +148,12 @@ def decide(game_id: int, body: DecisionIn, user: User = Depends(current_user), d
 @router.post("/games/{game_id}/fast-forward")
 def fast_forward(game_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     game = _own_game(game_id, user, db)
-    island = get_island(game.island_id)
     if game.status == "completed" and game.result:
         return game.result
-    if game.current_step < len(get_cards(island)):
+    island, scenario = _setup(game)
+    if game.current_step < len(get_cards(island, scenario)):
         raise HTTPException(status.HTTP_409_CONFLICT, "You still have decisions to make today")
-    report = build_report(island, [(d.card_id, d.option_id) for d in game.decisions])
+    report = build_report(island, scenario, [(d.card_id, d.option_id) for d in game.decisions])
     game.result = report
     game.score = report["score"]
     game.ending = report["ending"]["title"]

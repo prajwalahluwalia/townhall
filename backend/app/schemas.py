@@ -45,6 +45,7 @@ class AuthOut(BaseModel):
 
 class NewGameIn(BaseModel):
     island_id: str
+    scenario_id: str = "strait_crisis"
 
 
 class DecisionIn(BaseModel):

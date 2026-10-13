@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 // Single-series line chart with a hover crosshair. One measure per chart (small multiples).
 export default function LineChart({
@@ -13,9 +13,21 @@ export default function LineChart({
   height = 150,
   color = 'var(--chart)',
   goodDirection = null, // 'down' | 'up': colours the change pill
+  fill = false, // draw at the size of its box (for one-screen layouts) instead of a fixed shape
 }) {
-  const W = 320
-  const H = height
+  const plotRef = useRef(null)
+  const [box, setBox] = useState(null)
+  useLayoutEffect(() => {
+    if (!fill || !plotRef.current) return
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height: h } = entry.contentRect
+      if (width > 40 && h > 40) setBox({ w: Math.round(width), h: Math.round(h) })
+    })
+    observer.observe(plotRef.current)
+    return () => observer.disconnect()
+  }, [fill])
+  const W = box ? box.w : 320
+  const H = box ? box.h : height
   const pad = { l: 38, r: 46, t: 12, b: 22 }
   const wrapRef = useRef(null)
   const [hover, setHover] = useState(null)
@@ -44,7 +56,9 @@ export default function LineChart({
 
   const onMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const px = ((e.clientX - rect.left) / rect.width) * W
+    // The drawing keeps its shape, so it may sit centred with empty space beside it.
+    const scale = Math.min(rect.width / W, rect.height / H)
+    const px = (e.clientX - rect.left - (rect.width - W * scale) / 2) / scale
     const i = Math.round(((px - pad.l) / (W - pad.l - pad.r)) * (values.length - 1))
     setHover(Math.max(0, Math.min(lastI, i)))
   }
@@ -62,7 +76,7 @@ export default function LineChart({
           )}
         </span>
       </figcaption>
-      <div className="chart-plot">
+      <div className={`chart-plot ${fill ? 'fill' : ''}`} ref={plotRef}>
         <svg viewBox={`0 0 ${W} ${H}`} onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img"
           aria-label={`${title}: from ${format(values[0])}${unit} to ${format(shown[lastI])}${unit}`}>
           {ticks.map((t) => (

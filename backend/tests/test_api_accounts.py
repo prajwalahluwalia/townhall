@@ -1,3 +1,27 @@
+"""Accounts and saved games. Switched off for now (see app/main.py), so these tests are skipped."""
+
+import os
+
+import pytest
+
+pytest.skip("accounts and saved games are switched off", allow_module_level=True)
+
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://localhost/townhall_test")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.db import Base, engine  # noqa: E402
+from app.main import app  # noqa: E402
+
+
+@pytest.fixture()
+def client():
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    with TestClient(app) as c:
+        yield c
+
+
 def _register(client, name="governor"):
     r = client.post("/api/auth/register", json={"username": name, "email": f"{name}@example.com", "password": "secret123"})
     assert r.status_code == 201, r.text
@@ -18,8 +42,10 @@ def test_register_login_and_me(client):
 
 def test_full_term_saves_decisions_and_report(client):
     h = _register(client)
-    assert len(client.get("/api/islands").json()["islands"]) == 5
-    game = client.post("/api/games", json={"island_id": "kalani"}, headers=h).json()
+    listing = client.get("/api/islands").json()
+    assert len(listing["islands"]) == 5 and len(listing["scenarios"]) == 6
+    game = client.post("/api/games", json={"island_id": "kalani", "scenario_id": "grey_fever"}, headers=h).json()
+    assert game["scenario"]["id"] == "grey_fever" and "Kalani" in game["scenario"]["intro"]
     gid = game["id"]
     assert client.post(f"/api/games/{gid}/fast-forward", headers=h).status_code == 409
     while game["card"]:
@@ -32,8 +58,9 @@ def test_full_term_saves_decisions_and_report(client):
     report = client.post(f"/api/games/{gid}/fast-forward", headers=h).json()
     assert report["ending"]["title"]
     assert client.get(f"/api/games/{gid}/report", headers=h).json()["score"] == report["score"]
+    assert report["scenario"]["id"] == "grey_fever"
     games = client.get("/api/games", headers=h).json()
-    assert games[0]["status"] == "completed"
+    assert games[0]["status"] == "completed" and games[0]["scenario_title"] == "The Grey Fever"
 
 
 def test_cannot_touch_other_players_games(client):
@@ -48,3 +75,11 @@ def test_rejects_out_of_order_decision(client):
     gid = client.post("/api/games", json={"island_id": "aurelia"}, headers=h).json()["id"]
     r = client.post(f"/api/games/{gid}/decisions", json={"card_id": "rates", "option_id": "hold"}, headers=h)
     assert r.status_code == 409
+
+
+def test_new_game_defaults_to_war_and_rejects_unknown_scenario(client):
+    h = _register(client)
+    game = client.post("/api/games", json={"island_id": "aurelia"}, headers=h).json()
+    assert game["scenario"]["id"] == "strait_crisis" and game["card"]["id"] == "war"
+    r = client.post("/api/games", json={"island_id": "aurelia", "scenario_id": "zombies"}, headers=h)
+    assert r.status_code == 400

@@ -1,12 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { GLOSSARY } from '../glossary'
+import { Term } from './Explain'
+
+const word = Object.fromEntries(GLOSSARY.map((e) => [e.id, e]))
 
 const STATS = [
-  { key: 'approval', label: 'Approval', icon: '👥', fmt: (v) => `${Math.round(v)}%`, meter: true, better: 1 },
-  { key: 'inflation', label: 'Inflation', icon: '🔥', fmt: (v) => `${v.toFixed(1)}%`, better: -1 },
-  { key: 'interest_rate', label: 'Interest rate', icon: '🏦', fmt: (v) => `${v.toFixed(1)}%`, better: 0 },
-  { key: 'currency_index', label: 'Currency', icon: '💱', fmt: (v) => v.toFixed(1), better: 1, hint: '100 = this morning' },
-  { key: 'reserves_months', label: 'Reserves', icon: '🪙', fmt: (v) => `${v.toFixed(1)} mo`, better: 1, hint: 'Months of imports the bank can pay for' },
-  { key: 'debt_to_gdp', label: 'Debt', icon: '📜', fmt: (v) => `${Math.round(v)}% GDP`, better: -1 },
+  { key: 'approval', term: 'approval', label: 'Approval', icon: '👥', fmt: (v) => `${Math.round(v)}%`, meter: true, better: 1 },
+  { key: 'inflation', term: 'inflation', label: 'Inflation', icon: '🔥', fmt: (v) => `${v.toFixed(1)}%`, better: -1 },
+  { key: 'interest_rate', term: 'interest', label: 'Interest rate', icon: '🏦', fmt: (v) => `${v.toFixed(1)}%`, better: 0 },
+  { key: 'currency_index', term: 'currency', label: 'Currency', icon: '💱', fmt: (v) => v.toFixed(1), better: 1, hint: '100 = this morning' },
+  { key: 'reserves_months', term: 'reserves', label: 'Reserves', icon: '🪙', fmt: (v) => `${v.toFixed(1)} mo`, better: 1, hint: 'Months of imports the bank can pay for' },
+  { key: 'debt_to_gdp', term: 'pct_gdp', label: 'Debt', icon: '📜', fmt: (v) => `${Math.round(v)}% GDP`, better: -1 },
 ]
 
 export default function Hud({ stats, deltas = {}, currencyCode }) {
@@ -20,7 +24,9 @@ export default function Hud({ stats, deltas = {}, currencyCode }) {
           <div className="hud-stat" key={s.key} title={s.hint || ''}>
             <span className="hud-icon" aria-hidden>{s.icon}</span>
             <div className="hud-body">
-              <span className="hud-label">{s.key === 'currency_index' && currencyCode ? currencyCode : s.label}</span>
+              <span className="hud-label">
+                <Term entry={word[s.term]}>{s.key === 'currency_index' && currencyCode ? currencyCode : s.label}</Term>
+              </span>
               <span className="hud-value">{s.fmt(stats[s.key])}</span>
               {s.meter && (
                 <span className="meter"><span style={{ width: `${stats[s.key]}%` }} className={stats[s.key] < 35 ? 'low' : ''} /></span>
