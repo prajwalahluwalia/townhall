@@ -644,7 +644,7 @@ input:focus { border-color: var(--sea); outline: none; box-shadow: 0 0 0 3px rgb
   .topbar-middle { order: 3; width: 100%; }
   .home, .select, .report { padding-left: 16px; padding-right: 16px; }
   .day-layout, .forward-layout { padding: 8px 16px 32px; }
-  .hud { grid-template-columns: repeat(2, 1fr); }
+  .hud { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; }
   .options { grid-template-columns: 1fr; }
   .forward-charts { grid-template-columns: 1fr; }
   .facts { grid-template-columns: repeat(2, 1fr); }
@@ -659,6 +659,43 @@ input:focus { border-color: var(--sea); outline: none; box-shadow: 0 0 0 3px rgb
   .chain { gap: 26px; }
   .citizen-grid { grid-template-columns: 1fr; }
   .dots span { width: 9px; height: 9px; }
+  
+  /* Mobile button optimization */
+  .btn { padding: 12px 16px; min-height: 44px; min-width: 44px; font-size: 14px; }
+  .btn.big { padding: 14px 20px; font-size: 16px; }
+  .btn.small { padding: 6px 12px; font-size: 13px; }
+  
+  /* Mobile text sizing */
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.2rem; }
+  h3 { font-size: 1rem; }
+  body { font-size: 14px; }
+  
+  /* Mobile panel spacing */
+  .panel { padding: 16px; margin-bottom: 12px; }
+  
+  /* Mobile agenda/HUD */
+  .agenda { max-height: 40vh; overflow-y: auto; }
+  .agenda ol { padding-left: 16px; }
+  
+  /* Touch-friendly input areas */
+  input, textarea { min-height: 44px; padding: 10px 12px; font-size: 16px; }
+}
+
+@media (max-width: 480px) {
+  .topbar { gap: 8px; padding: 6px 12px; }
+  .brand { font-size: 1.1rem; }
+  .home, .select, .report { padding: 8px; }
+  .day-layout, .forward-layout { padding: 4px 8px 24px; }
+  .panel { padding: 12px; }
+  .btn { padding: 10px 14px; font-size: 13px; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.1rem; }
+  body { font-size: 13px; }
+  .archipelago { grid-template-columns: 1fr; }
+  .facts { grid-template-columns: 1fr; }
+  .hud { grid-template-columns: 1fr; }
+  .citizens-row { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 1000px), (max-height: 560px) {
