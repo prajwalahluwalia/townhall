@@ -506,9 +506,9 @@ input:focus { border-color: var(--sea); outline: none; box-shadow: 0 0 0 3px rgb
 .page.fit .hud-value { font-size: 1.25em; }
 .page.fit .day-layout {
   width: 100%; max-width: none; margin: 0; padding: 0.4vh 4% 2.2vh; gap: 2%;
-  grid-template-columns: 47% 1fr; align-items: stretch; font-size: clamp(12px, 2vh, 19px);
+  grid-template-columns: 51% 1fr; align-items: stretch; font-size: clamp(12px, 2vh, 19px);
 }
-.page.fit .scene-col { position: static; min-height: 0; gap: 1.6vh; }
+.page.fit .scene-col { position: static; min-height: 0; gap: 1.2vh; }
 /* The island picture spans the full column width; useSceneFit sets its height (--scene-h) to the
    natural height, capped to the room left above the other panels. */
 .page.fit .scene-col > *, .page.fit .forward-scene > * { flex: none; width: 100%; }
@@ -536,11 +536,11 @@ input:focus { border-color: var(--sea); outline: none; box-shadow: 0 0 0 3px rgb
 .page.fit .crowd-verdict, .page.fit .foreshadow { padding: 1vh 1em; }
 
 /* today's appointments (under the island) */
-.agenda { flex: 0 0 auto; padding: 1.2vh 1em; display: flex; flex-direction: column; gap: 0.6vh; font-size: 0.88em; }
+.agenda { flex: 0 0 auto; padding: 1.1vh 1em; display: flex; flex-direction: column; gap: 0.4vh; font-size: 0.97em; }
 .agenda h3 { margin: 0; font-size: 1em; }
-.agenda ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35vh; }
+.agenda ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .agenda li > button, .agenda li > div {
-  width: 100%; display: flex; align-items: center; gap: 0.6em; padding: 0.35vh 0.6em; border-radius: 10px;
+  width: 100%; display: flex; align-items: center; gap: 0.6em; padding: 0.2vh 0.6em; border-radius: 8px;
   border: 0; background: none; font: inherit; color: inherit; text-align: left;
 }
 .agenda li > button { cursor: pointer; }
@@ -548,7 +548,7 @@ input:focus { border-color: var(--sea); outline: none; box-shadow: 0 0 0 3px rgb
 .agenda li.now > div { background: #fff3bf; font-weight: 800; }
 .agenda li.later { color: var(--muted); }
 .agenda li.later .portrait { filter: grayscale(0.7); opacity: 0.6; }
-.agenda .portrait { width: 1.9em; height: 1.9em; }
+.agenda .portrait { width: 1.8em; height: 1.9em; }
 .agenda-time { font-family: var(--font-head); font-weight: 700; min-width: 3.2em; }
 .agenda-what { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .agenda .chip { order: 0; margin-left: 0; font-size: 0.8em; }
