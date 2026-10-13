@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import IslandArt from '../components/IslandArt'
 import TopBar from '../components/TopBar'
+import MobileWarning from '../components/MobileWarning'
 
 export default function Home() {
   const { user } = useAuth()
@@ -30,6 +31,7 @@ export default function Home() {
 
   return (
     <div className="page">
+      <MobileWarning />
       <TopBar />
       <main className="home">
         <section className="home-hero">

@@ -10,6 +10,7 @@ import IslandArt from '../components/IslandArt'
 import { skyForTime } from '../series'
 import Portrait from '../components/Portrait'
 import TopBar from '../components/TopBar'
+import MobileWarning from '../components/MobileWarning'
 import useSceneFit from '../components/useSceneFit'
 import WorldMap from '../components/WorldMap'
 
@@ -196,6 +197,7 @@ export default function Game() {
 
   return (
     <div className={`page fit game-page sky-${skyForTime(time)}`}>
+      <MobileWarning />
       <TopBar actions={introSeen && <button className="btn small" onClick={() => setShowBriefing(true)}>📋 Briefing</button>}>
         <Progress step={shownGame().step} total={game.total_steps} time={time} onPick={setReview} />
       </TopBar>

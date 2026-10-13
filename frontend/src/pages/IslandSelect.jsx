@@ -6,6 +6,7 @@ import { newPlay } from '../play'
 import Explain from '../components/Explain'
 import IslandArt from '../components/IslandArt'
 import TopBar from '../components/TopBar'
+import MobileWarning from '../components/MobileWarning'
 
 const DIFFICULTY = { rich: 1, developed: 2, developing: 3, poor: 4, very_poor: 5 }
 
@@ -126,6 +127,7 @@ export default function IslandSelect() {
   if (stage === 'crisis') {
     return (
       <div className="page fit">
+        <MobileWarning />
         <TopBar />
         <ScenarioPicker data={data} island={island} onBack={() => setParams({})} />
       </div>
@@ -134,6 +136,7 @@ export default function IslandSelect() {
 
   return (
     <div className="page fit">
+      <MobileWarning />
       <TopBar />
       <main className="select">
         <div className="select-head">

@@ -8,6 +8,7 @@ import IslandArt from '../components/IslandArt'
 import LineChart from '../components/LineChart'
 import Portrait from '../components/Portrait'
 import TopBar from '../components/TopBar'
+import MobileWarning from '../components/MobileWarning'
 import { CAUSES } from '../causes'
 import { moodFromApproval, quarterLabels, seriesOf } from '../series'
 
@@ -74,6 +75,7 @@ export default function Report() {
 
   return (
     <div className="page report-page">
+      <MobileWarning />
       <TopBar />
       <main className="report">
         <section className="report-hero panel">
